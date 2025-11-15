@@ -16,6 +16,38 @@
 # sudo ln -s /opt/cmake/bin/* /usr/local/bin/
 cmake_minimum_required(VERSION 3.24 FATAL_ERROR)
 
+# Some distributions expose nvcc via a wrapper such as /usr/bin/nvcc which
+# hides the actual toolkit layout from CMake's CUDA detection logic (nvcc -v
+# omits the TOP/NVVMIR lines). Resolve nvcc to its real location before the
+# project() call so that CMake can discover the CUDA libraries reliably.
+if(NOT DEFINED CMAKE_CUDA_COMPILER OR NOT CMAKE_CUDA_COMPILER)
+  find_program(_ESSENTIALS_NVCC
+    NAMES nvcc
+    HINTS
+      ENV CUDA_HOME
+      ENV CUDAToolkit_ROOT
+      /usr/local/cuda
+    PATH_SUFFIXES bin
+  )
+else()
+  set(_ESSENTIALS_NVCC "${CMAKE_CUDA_COMPILER}")
+endif()
+
+if(_ESSENTIALS_NVCC)
+  get_filename_component(_ESSENTIALS_NVCC_REAL "${_ESSENTIALS_NVCC}" REALPATH)
+  get_filename_component(_ESSENTIALS_NVCC_NAME "${_ESSENTIALS_NVCC_REAL}" NAME_WE)
+  if(_ESSENTIALS_NVCC_NAME STREQUAL "nvcc")
+    if(NOT DEFINED CMAKE_CUDA_COMPILER OR NOT CMAKE_CUDA_COMPILER
+       OR NOT "${CMAKE_CUDA_COMPILER}" STREQUAL "${_ESSENTIALS_NVCC_REAL}")
+      message(STATUS "Using nvcc at ${_ESSENTIALS_NVCC_REAL}")
+    endif()
+    set(CMAKE_CUDA_COMPILER "${_ESSENTIALS_NVCC_REAL}" CACHE FILEPATH "CUDA compiler" FORCE)
+  endif()
+endif()
+unset(_ESSENTIALS_NVCC)
+unset(_ESSENTIALS_NVCC_REAL)
+unset(_ESSENTIALS_NVCC_NAME)
+
 # begin /* Update Essentials version */
 set(ESSENTIALS_VERSION_MAJOR 2)
 set(ESSENTIALS_VERSION_MINOR 1)
